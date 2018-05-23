@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# Get the url of the playlist
+playlist_url=$1; shift
+output_file=$(realpath -m "$1"); shift
+
+tmp_dir=$(mktemp -d)
+
+CYAN="\033[1;36m"
+YELLOW="\033[1;33m"
+NO_COLOR="\033[0m"
+
+pushd "${tmp_dir}" > /dev/null
+
+printf "${CYAN}Downloading fragments from playlist...${NO_COLOR}\n"
+
+curl -Ls "${playlist_url}" \
+	| awk "{
+		if (\$0 !~ /^#/) {
+			printf(\"curl '%s' > '%d.mp3'\", \$0, n);
+			n++;
+		}
+	}" \
+	| sh
+
+printf "${CYAN}Combining ${YELLOW}$(ls *.mp3 | wc -l)${CYAN} fragments...${NO_COLOR}\n"
+
+ls *.mp3 | sort -n | sed 's/^/file /' > ffmpeg.concat
+
+ffmpeg -f concat -i ffmpeg.concat -c:a copy "${output_file}"
+
+popd > /dev/null
+
+rm -rf "${tmp_dir}"
